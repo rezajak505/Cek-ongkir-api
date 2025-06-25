@@ -1,42 +1,54 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
-const app = express();
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
 
+const app = express();
 app.use(cors());
 app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
-const API_KEY = "nJdqJwaE157fbeea21508cb0T3B9h6sz";
+// Endpoint cek ongkir (pakai RajaOngkir)
+app.post('/cek-ongkir', async (req, res) => {
+  const { asal, tujuan, berat, kurir } = req.body;
 
-app.get("/api/cities", async (req, res) => {
-  try {
-    const response = await axios.get("https://api.rajaongkir.com/starter/city", {
-      headers: { key: API_KEY }
-    });
-    res.json(response.data.rajaongkir.results);
-  } catch (err) {
-    res.status(500).json({ error: "Gagal ambil data kota" });
+  if (!asal || !tujuan || !berat || !kurir) {
+    return res.status(400).json({ error: 'Lengkapi semua input' });
   }
-});
 
-app.post("/api/ongkir", async (req, res) => {
-  const { origin, destination, weight, courier } = req.body;
   try {
-    const response = await axios.post("https://api.rajaongkir.com/starter/cost", {
-      origin,
-      destination,
-      weight,
-      courier
+    const response = await axios.post('https://api.rajaongkir.com/starter/cost', {
+      origin: asal,
+      destination: tujuan,
+      weight: berat,
+      courier: kurir
     }, {
       headers: {
-        key: API_KEY,
-        "content-type": "application/json"
+        key: process.env.RAJAONGKIR_API_KEY,
+        'content-type': 'application/x-www-form-urlencoded'
       }
     });
-    res.json(response.data.rajaongkir);
+
+    const hasil = response.data.rajaongkir.results[0].costs[0];
+
+    res.json({
+      kurir: kurir.toUpperCase(),
+      service: hasil.service,
+      ongkir: hasil.cost[0].value,
+      estimasi: hasil.cost[0].etd + ' hari'
+    });
+
   } catch (err) {
-    res.status(500).json({ error: "Gagal cek ongkir" });
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: 'Gagal cek ongkir' });
   }
 });
 
-app.listen(3000, () => console.log("Server jalan di http://localhost:3000"));
+// Root handler
+app.get('/', (req, res) => {
+  res.send('API Cek Ongkir Aktif dengan RajaOngkir');
+});
+
+app.listen(PORT, () => {
+  console.log(`Server aktif di http://localhost:${PORT}`);
+});
